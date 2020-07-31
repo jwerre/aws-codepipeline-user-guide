@@ -38,14 +38,14 @@ Use the following steps to create a Lambda function and a Lambda execution role\
 
 1. To use a variable from another action, it will have to be passed to the `UserParameters` in the Lambda invoke action configuration\. You will be configuring the action in our pipeline later in the tutorial, but you will add the code assuming the variable will be passed\.
 
-   ```
+   ```js
    const commitId =
    event["CodePipeline.job"].data.actionConfiguration.configuration.UserParameters;
    ```
 
    To produce new variables, set a property called `outputVariables` on the input to `putJobSuccessResult`\. Note that you cannot produce variables as part of a `putJobFailureResult`\.
 
-   ```
+   ```js
    const successInput = {
      jobId: jobId,
      outputVariables: {
@@ -58,73 +58,71 @@ Use the following steps to create a Lambda function and a Lambda execution role\
 
    In your new function, leave **Edit code inline** selected, and paste the following example code under `index.js`\.
 
-   ```
-   var AWS = require('aws-sdk');
-   
-   exports.handler = function(event, context) {
-       var codepipeline = new AWS.CodePipeline();
-       
-       // Retrieve the Job ID from the Lambda action
-       var jobId = event["CodePipeline.job"].id;
-       
-       // Retrieve the value of UserParameters from the Lambda action configuration in AWS CodePipeline,
-       // in this case it is the Commit ID of the latest change of the pipeline.
-       var commitId = event["CodePipeline.job"].data.actionConfiguration.configuration.UserParameters; 
-       
-       // The region from where the lambda function is being executed.
-       var lambdaRegion = process.env.AWS_REGION;
-       
-       // Notify AWS CodePipeline of a successful job
-       var putJobSuccess = function(message) {
-           var successInput = {
-               jobId: jobId,
-               outputVariables: {
-                   testRunId: Math.floor(Math.random() * 1000).toString(),
-                   dateTime: Date(Date.now()).toString(),
-                   region: lambdaRegion
-               }
-           };
-           codepipeline.putJobSuccessResult(params, function(err, data) {
-               if(err) {
-                   context.fail(err);      
-               } else {
-                   context.succeed(message);      
-               }
-           });
-       };
-       
-       // Notify AWS CodePipeline of a failed job
-       var putJobFailure = function(message) {
-           var failureInput = {
-               jobId: jobId,
-               failureDetails: {
-                   message: JSON.stringify(message),
-                   type: 'JobFailed',
-                   externalExecutionId: context.invokeid
-               }
-           };
-           codepipeline.putJobFailureResult(params, function(err, data) {
-               context.fail(message);      
-           });
-       };
-       
-       var sendResult = function() {
-           try {
-               console.log("Testing commit - " + commitId);
-               
-               // Your tests here
-               
-               // Succeed the job
-               putJobSuccess("Tests passed.");
-           } catch (ex) {
-               // If any of the assertions failed then fail the job
-               putJobFailure(ex);    
-           }
-       };
-       
-       sendResult();
-   };
-   ```
+```js
+const AWS = require('aws-sdk');
+
+exports.handler = function(event, context) {
+    
+    const codepipeline = new AWS.CodePipeline();
+    
+    // Retrieve the Job ID from the Lambda action
+    const jobId = event["CodePipeline.job"].id;
+    
+    // Retrieve the value of UserParameters from the Lambda action configuration in AWS CodePipeline,
+    // in this case it is the Commit ID of the latest change of the pipeline.
+    const commitId = event["CodePipeline.job"].data.actionConfiguration.configuration.UserParameters; 
+    
+    // Notify AWS CodePipeline of a successful job
+    const putJobSuccess = function(message) {
+        let successInput = {
+            jobId: jobId,
+            outputVariables: {
+                testRunId: Math.floor(Math.random() * 1000).toString(),
+                dateTime: Date(Date.now()).toString(),
+                region: process.env.AWS_REGION
+            }
+        };
+        codepipeline.putJobSuccessResult(successInput, function(err, data) {
+            if(err) {
+                context.fail(err);      
+            } else {
+                context.succeed(message);      
+            }
+        });
+    };
+    
+    // Notify AWS CodePipeline of a failed job
+    const putJobFailure = function(message) {
+        let failureInput = {
+            jobId: jobId,
+            failureDetails: {
+                message: JSON.stringify(message),
+                type: 'JobFailed',
+                externalExecutionId: context.invokeid
+            }
+        };
+        codepipeline.putJobFailureResult(failureInput, function(err, data) {
+            context.fail(message);      
+        });
+    };
+    
+    const sendResult = function() {
+        try {
+            console.log("Testing commit - " + commitId);
+            
+            // Your tests here
+            
+            // Succeed the job
+            putJobSuccess("Tests passed.");
+        } catch (ex) {
+            // If any of the assertions failed then fail the job
+            putJobFailure(ex);    
+        }
+    };
+    
+    sendResult();
+};
+```
 
 1. Choose **Save**\.
 
